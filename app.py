@@ -5,7 +5,7 @@ from io import BytesIO, StringIO
 from fpdf import FPDF
 from flask import Flask, render_template, request, flash, redirect, url_for, Response, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
-from model import db, User, Customer, Employee
+from model import db, User, Customer, Employee, Lead, UserRole, LeadStatus, CustomerStatus, LeadSource, ActivityType
 from config import Config
 from flask_login import logout_user, login_required, LoginManager, UserMixin, login_user, current_user
 from flask_migrate import Migrate
@@ -139,7 +139,7 @@ def register():
             username=username,
             email=email,
             phone_number=phone_number,
-            role=role,
+            role=UserRole.__members__.get(role.upper(), UserRole.EMPLOYEE) if role else UserRole.EMPLOYEE,
             password=hashed_password
         )
         db.session.add(new_user)
@@ -149,8 +149,6 @@ def register():
         new_employee = Employee(
             user_id=new_user.id,
             name=username,
-            email=email,
-            phone_number=phone_number,
             position=role
         )
         db.session.add(new_employee)
@@ -183,13 +181,13 @@ def export_customer(format):
             'address': str(c.address or '—'),
             'city': str(c.city or '—'),
             'company': str(c.company or '—'),
-            'source': str(c.source or '—'),
-            'status': str(c.status or 'New'),
+            'source': str(c.source.value if c.source else '—'),
+            'status': str(c.status.value if c.status else 'New'),
             'created_date': c.created_at.strftime('%Y-%m-%d') if c.created_at else '—',
             'updated_date': c.updated_at.strftime('%Y-%m-%d') if c.updated_at else '—',
-            'assigned_to': c.assignee.username if c.assignee else 'Unassigned',
-            'created_by': c.creator.username if c.creator else 'Unknown',
-            'updated_by': c.updater.username if c.updater else 'Unknown'
+            'assigned_to': c.assignee.user.username if c.assignee and c.assignee.user else 'Unassigned',
+            'created_by': c.creator.user.username if c.creator and c.creator.user else 'Unknown',
+            'updated_by': c.updater.user.username if c.updater and c.updater.user else 'Unknown'
         })
     
     headers = ['ID', 'Name', 'Email', 'Phone','Address' ,'City', 'Company', 'Source','Status', 'Created_Date', 'Updated_Date','Assigned_To', 'Created_By', 'Updated_By']
@@ -382,6 +380,9 @@ def add_customer():
             flash('A customer with this email already exists.', 'customererror')
             return redirect(url_for('add_customer'))
 
+        # Map display values ("Website") to Enum instances
+        source_map = {e.value: e for e in LeadSource}
+        status_map = {e.value: e for e in CustomerStatus}
         new_customer = Customer(
             name=name,
             email=email,
@@ -389,8 +390,8 @@ def add_customer():
             address=address,
             city=city,
             company=company,
-            source=source,
-            status=status,
+            source=source_map.get(source, LeadSource.OTHER),
+            status=status_map.get(status, CustomerStatus.NEW),
             notes=notes,
             created_by=current_user.employee.id,
             assigned_to=assigned_to_id
@@ -442,14 +443,16 @@ def edit_customer(customer_id):
             flash('Another customer with this email already exists.', 'customererror')
             return redirect(url_for('edit_customer', customer_id=customer_id))
 
+        source_map = {e.value: e for e in LeadSource}
+        status_map = {e.value: e for e in CustomerStatus}
         customer.name = name
         customer.email = email
         customer.phone_number = phone_number
         customer.address = address
         customer.city = city
         customer.company = company
-        customer.source = source
-        customer.status = status
+        customer.source = source_map.get(source, LeadSource.OTHER)
+        customer.status = status_map.get(status, CustomerStatus.NEW)
         customer.notes = notes
         customer.assigned_to = assigned_to_id
         customer.updated_by = current_user.employee.id
@@ -498,14 +501,13 @@ def bulk_upload():
                 source = str(row.get('Source', '')).strip()
                 status = str(row.get('Status', '')).strip()
                 
-                #if assigned is mentioned in the csv, assign to that user, else assign to uploader
+                # Assign to employee by email; fall back to uploader's employee
                 assigned_to_email = str(row.get('Assigned_To', '')).strip()
+                assigned_to_id = current_user.employee.id  # default
                 if assigned_to_email:
-                    assigned_user = User.query.filter_by(email=assigned_to_email).first()
-                    if assigned_user:
-                        assigned_to_id = assigned_user.id
-                    else:
-                        assigned_to_id = current_user.id
+                    assigned_emp = Employee.query.join(User).filter(User.email == assigned_to_email).first()
+                    if assigned_emp:
+                        assigned_to_id = assigned_emp.id
 
                 if not all([name, email, phone_number]):
                     continue  # skip invalid rows
@@ -513,6 +515,8 @@ def bulk_upload():
                     continue  # skip invalid phone numbers
                 if Customer.query.filter_by(email=email, is_deleted=False).first():
                     continue  # skip duplicates
+                source_map = {e.value: e for e in LeadSource}
+                status_map = {e.value: e for e in CustomerStatus}
                 new_customer = Customer(
                     name=name,
                     email=email,
@@ -520,10 +524,10 @@ def bulk_upload():
                     address=address,
                     city=city,
                     company=company,
-                    source=source,
-                    status=status,
+                    source=source_map.get(source, LeadSource.OTHER),
+                    status=status_map.get(status, CustomerStatus.NEW),
                     created_by=current_user.employee.id,
-                    assigned_to=Employee.query.filter_by(email=assigned_to_email).first().id if assigned_to_email and Employee.query.filter_by(email=assigned_to_email).first() else current_user.employee.id
+                    assigned_to=assigned_to_id
                 )
                 db.session.add(new_customer)
             db.session.commit()
@@ -557,19 +561,29 @@ def add_employee():
             flash('All fields are required.', 'employeeerror')
             return redirect(url_for('add_employee'))
 
-        if Employee.query.filter_by(email=email).first():
-            flash('Employee with this email already exists.', 'employeeerror')
+        if User.query.filter_by(email=email).first():
+            flash('User/Employee with this email already exists.', 'employeeerror')
             return redirect(url_for('add_employee'))
 
-        new_employee = Employee(
-            name=name,
+        # Create linked User account with default password
+        new_user = User(
+            username=name.lower().replace(" ", "_"),
             email=email,
             phone_number=phone_number,
+            role=UserRole.EMPLOYEE,
+            password=generate_password_hash('Glass@123') # Default password
+        )
+        db.session.add(new_user)
+        db.session.flush()
+
+        new_employee = Employee(
+            user_id=new_user.id,
+            name=name,
             position=position
         )
         db.session.add(new_employee)
         db.session.commit()
-        flash('Employee added successfully!', 'employeesuccess')
+        flash(f'Employee added successfully! Default password is Glass@123', 'employeesuccess')
         return redirect(url_for('employee'))
 
     return render_template('employee/add_employee.html')
@@ -592,15 +606,17 @@ def edit_employee(employee_id):
             return redirect(url_for('edit_employee', employee_id=employee_id))
 
         # Check duplicate email excluding current employee
-        existing = Employee.query.filter(Employee.email == email, Employee.id != employee_id, Employee.is_deleted == False).first()
-        if existing:
-            flash('Another employee with this email already exists.', 'employeeerror')
+        existing_user = User.query.filter(User.email == email, User.id != employee.user_id).first()
+        if existing_user:
+            flash('Another user/employee with this email already exists.', 'employeeerror')
             return redirect(url_for('edit_employee', employee_id=employee_id))
 
         employee.name = name
-        employee.email = email
-        employee.phone_number = phone_number
         employee.position = position
+        
+        # Update linked User account
+        employee.user.email = email
+        employee.user.phone_number = phone_number
         
         try:
             db.session.commit()
@@ -620,5 +636,301 @@ def delete_employee(employee_id):
     db.session.commit()
     flash('Employee deleted successfully!', 'employeesuccess')
     return redirect(url_for('employee'))
+@app.route('/leads')
+@login_required
+def leads():
+    all_leads = Lead.query.filter_by(is_deleted=False).order_by(Lead.created_at.desc()).all()
+    all_employees = Employee.query.filter_by(is_deleted=False).all()
+    # Get unique status/sources from Enum for filters? Actually Enum is fine, we can hardcode filters in template.
+    return render_template('Leads/Lead.html', leads=all_leads, employees=all_employees)
+@app.route('/add-lead', methods=['GET', 'POST'])
+@login_required
+def add_lead():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        email = request.form.get('email')
+        phone_number = request.form.get('phone')
+        company = request.form.get('company')
+        source = request.form.get('source')
+        status = request.form.get('status')
+        notes = request.form.get('notes')
+        assigned_to_id = request.form.get('assigned_to')
+        if not assigned_to_id or assigned_to_id == 'unassigned':
+            assigned_to_id = None
+        else:
+            assigned_to_id = int(assigned_to_id)
+
+        if not all([name, email, phone_number]):
+            flash('Name, Email, and Phone Number are required.', 'leadserror')
+            return redirect(url_for('add_lead'))
+
+        if len(phone_number) != 10:
+            flash('Phone number must be exactly 10 digits.', 'leadserror')
+            return redirect(url_for('add_lead'))
+
+        if Lead.query.filter_by(email=email, is_deleted=False).first():
+            flash('A lead with this email already exists.', 'leadserror')
+            return redirect(url_for('add_lead'))
+
+        source_map = {e.value: e for e in LeadSource}
+        status_map = {e.value: e for e in LeadStatus}
+        new_lead = Lead(
+            name=name,
+            email=email,
+            phone_number=phone_number,
+            company=company,
+            source=source_map.get(source, LeadSource.OTHER),
+            status=status_map.get(status, LeadStatus.NEW),
+            notes=notes,
+            created_by=current_user.employee.id,
+            assigned_to=assigned_to_id
+        )
+        try:
+            db.session.add(new_lead)
+            db.session.commit()
+            flash('Lead added successfully!', 'leadssuccess')
+            return redirect(url_for('leads'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error saving lead: {str(e)}', 'leadserror')
+            return redirect(url_for('add_lead'))
+
+    employees = Employee.query.filter_by(is_deleted=False).all()
+    return render_template('Leads/addLead.html', employees=employees)
+@app.route('/edit-lead/<int:lead_id>', methods=['GET', 'POST'])
+@login_required
+def edit_lead(lead_id):
+    lead = Lead.query.get_or_404(lead_id)
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        phone_number = re.sub(r'\D', '', request.form.get('phone', ''))
+        company = request.form.get('company', '').strip()
+        source = request.form.get('source', '').strip()
+        status = request.form.get('status', '').strip()
+        notes = request.form.get('notes', '').strip()
+        assigned_to_id = request.form.get('assigned_to')
+        if not assigned_to_id or assigned_to_id == 'unassigned':
+            assigned_to_id = None
+        else:
+            assigned_to_id = int(assigned_to_id)
+
+        if not all([name, email, phone_number]):
+            flash('Name, Email, and Phone Number are required.', 'leadserror')
+            return redirect(url_for('edit_lead', lead_id=lead_id))
+
+        if len(phone_number) != 10:
+            flash('Phone number must be exactly 10 digits.', 'leadserror')
+            return redirect(url_for('edit_lead', lead_id=lead_id))
+
+        existing = Lead.query.filter(Lead.email == email, Lead.id != lead_id, Lead.is_deleted == False).first()
+        if existing:
+            flash('Another lead with this email already exists.', 'leadserror')
+            return redirect(url_for('edit_lead', lead_id=lead_id))
+
+        source_map = {e.value: e for e in LeadSource}
+        status_map = {e.value: e for e in LeadStatus}
+        lead.name = name
+        lead.email = email
+        lead.phone_number = phone_number
+        lead.company = company
+        lead.source = source_map.get(source, LeadSource.OTHER)
+        lead.status = status_map.get(status, LeadStatus.NEW)
+        lead.notes = notes
+        lead.assigned_to = assigned_to_id
+        lead.updated_by = current_user.employee.id
+
+        try:
+            db.session.commit()
+            flash('Lead updated successfully!', 'leadssuccess')
+            return redirect(url_for('leads'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating lead: {str(e)}', 'leadserror')
+            return redirect(url_for('edit_lead', lead_id=lead_id))
+    employees = Employee.query.filter_by(is_deleted=False).all()
+    return render_template('Leads/editLead.html', lead=lead, lead_id=lead_id, employees=employees)
+@app.route('/delete-lead/<int:lead_id>', methods=['POST'])
+@login_required
+def delete_lead(lead_id):
+    lead = Lead.query.get_or_404(lead_id)
+    lead.is_deleted = True
+    db.session.commit()
+    flash('Lead deleted successfully!', 'leadssuccess')
+    return redirect(url_for('leads'))
+@app.route('/export-leads/<string:format>')
+@login_required
+def export_leads(format):
+    leads = Lead.query.filter_by(is_deleted=False).order_by(Lead.created_at.desc()).all()
+    
+    data = []
+    for l in leads:
+        data.append({
+            'id': str(l.id),
+            'name': str(l.name or ''),
+            'email': str(l.email or ''),
+            'phone': str(l.phone_number or ''),
+            'company': str(l.company or '—'),
+            'source': str(l.source.value if l.source else '—'),
+            'status': str(l.status.value if l.status else 'New'),
+            'created_date': l.created_at.strftime('%Y-%m-%d') if l.created_at else '—',
+            'updated_date': l.updated_at.strftime('%Y-%m-%d') if l.updated_at else '—',
+            'assigned_to': l.assignee.user.username if l.assignee and l.assignee.user else 'Unassigned',
+            'created_by': l.creator.user.username if l.creator and l.creator.user else 'Unknown',
+            'updated_by': l.updater.user.username if l.updater and l.updater.user else 'Unknown'
+        })
+    
+    headers = ['ID', 'Name', 'Email', 'Phone', 'Company', 'Source','Status', 'Created_Date', 'Updated_Date','Assigned_To', 'Created_By', 'Updated_By']
+    
+    if format == 'csv':
+        si = StringIO()
+        cw = csv.writer(si)
+        cw.writerow(headers)
+        for row in data:
+            cw.writerow([row[h.lower()] for h in headers])
+        return Response(
+            si.getvalue(),
+            mimetype='text/csv',
+            headers={"Content-Disposition": "attachment;filename=leads.csv"}
+        )
+    
+    # Excel and PDF export logic would be similar to customers, adjusted for lead fields
+    elif format=='excel':
+        df=pd.DataFrame(data)
+        output=BytesIO()
+        
+        with pd.ExcelWriter(output,engine='xlsxwriter') as writer:
+            df.to_excel(writer,index=False,sheet_name='Leads')
+            workbook=writer.book
+            worksheet=writer.sheets['Leads']
+            
+            gold_color='#D4AF37'
+            navy_color='#0D1B2A'
+            
+            header_fmt=workbook.add_format({
+                'bold':True,
+                'bg_color':gold_color,
+                'font_color':'#FFFFFF',
+                'border':1,
+                'align':'center',
+                'valign':'middle'
+            })
+            
+            cell_fmt=workbook.add_format({
+                'border':1,
+                'valign':'middle',
+                'font_name':'Arial',
+                'font_size':10
+            })
+            
+            alt_row_fmt=workbook.add_format({
+                'border':1,
+                'bg_color':'#FBFAFA',
+                'valign':'middle',
+                'font_name':'Arial',
+                'font_size':10
+            })
+            
+            for col_num, value in enumerate(headers):
+                worksheet.write(0,col_num,value,header_fmt)
+                
+            col_settings=[
+                (0, 8, 'center'),
+                (1, 20, 'left'),
+                (2, 25, 'left'),
+                (3, 15, 'center'),
+                (4, 30, 'left'),
+                (5, 15, 'left'),
+                (6, 20, 'left'),
+                (7, 12, 'center'),
+                (8, 12, 'center'),
+                (9, 15, 'center'),
+                (10, 15, 'center'),
+                (11, 15, 'left'),
+                (12, 12, 'left'),
+                (13, 12, 'left'),   
+            ]
+            
+            for col_idx, width, align in col_settings:
+                fmt=workbook.add_format({'border':1, 'align':align, 'valign':'middle'})
+                worksheet.set_column(col_idx, col_idx, width, fmt)
+            
+            worksheet.freeze_panes(1,0)
+            worksheet.autofilter(0, 0, len(df), len(headers)-1)
+            
+            for row_idx in range(1, len(df)+1):
+                if row_idx % 2==0:
+                    for col_idx in range(len(headers)):
+                        align=next(s[2] for s in col_settings if s[0]== col_idx)
+                        row_fmt=workbook.add_format({
+                            'bg_color':'#F8F9FA',
+                            'border':1,
+                            'align':align,
+                            'valign':'middle'
+                        })
+                        val = df.iloc[row_idx-1, col_idx]
+                        worksheet.write(row_idx, col_idx, val, row_fmt)
+        
+        output.seek(0)
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name="Leads_report.xlsx",
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    elif format=='pdf':
+        from datetime import datetime
+        class PDF(FPDF):
+            def footer(self):
+                self.set_y(-15)
+                self.set_font('helvetica','I',8)
+                self.cell(0,10, f'Page {self.page_no()}', 0, 0, 'C')
+        pdf=PDF(orientation='L',unit='mm', format='A4')
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+        
+        pdf.set_font("helvetica", 'B', 16)
+        pdf.set_text_color(13,27,42)
+        pdf.cell(0, 15, "Lead Management Report", 0, 1, 'L')
+        pdf.set_font("helvetica",size=9)
+        pdf.set_text_color(100)
+        current_date_str=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        pdf.cell(0, 5, f"Data Generated: {current_date_str}", 0, 1, 'L')
+        pdf.ln(10)
+        widths=[10, 20, 30, 22, 25, 20, 25, 20, 20, 25, 20, 20]
+        
+        pdf.set_font("helvetica", 'B', 7)
+        pdf.set_fill_color(212, 175, 55)
+        pdf.set_text_color(255)
+        h=8
+        for i, header_val in enumerate(headers):
+            pdf.cell(widths[i], h, header_val, border=1, fill=True, align='C')
+        pdf.ln()
+        
+        pdf.set_font("helvetica", size=7)
+        pdf.set_text_color(0)
+        
+        for idx, row in enumerate(data):
+            if idx % 2==0:
+                pdf.set_fill_color(248, 249, 250)
+            else:
+                pdf.set_fill_color(255, 255, 255)
+            
+            for i, header_val in enumerate(headers):
+                val=str(row.get(header_val.lower(), ''))
+                pdf.cell(widths[i], h, val[:25], border=1, fill=True, align='L')
+            pdf.ln()
+        pdf_output=pdf.output()
+        buffer=BytesIO(pdf_output)
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name="Leads_report.pdf",
+            mimetype='application/pdf'
+        )
+    flash('Invalid format or export error.', 'leadserror')
+    return redirect(url_for('leads'))
 if __name__ == '__main__':
     app.run(debug=True)

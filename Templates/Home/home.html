@@ -25,7 +25,7 @@
         <nav class="dash-menu">
             <a href="#" class="active">Dashboard</a>
             <a href="{{ url_for('customers') }}">Customers</a>
-            <a href="#">Leads</a>
+            <a href="{{ url_for('leads') }}">Leads</a>
             <a href="#">Deals</a>
             <a href="#">Tasks</a>
             <div class="dropdown">
@@ -134,10 +134,10 @@
                                 <td>{{ customer.city or '—' }}</td>
                                 <td>{{ customer.assignee.name if customer.assignee else 'Unassigned' }}</td>
                                 <td>
-                                    {% if customer.status in ['Active', 'Closed Won'] %}
-                                    <span class="status-badge status-active">{{ customer.status }}</span>
+                                    {% if customer.status_display == 'Active' %}
+                                    <span class="status-badge status-active">{{ customer.status_display }}</span>
                                     {% else %}
-                                    <span class="status-badge status-pending">{{ customer.status }}</span>
+                                    <span class="status-badge status-pending">{{ customer.status_display }}</span>
                                     {% endif %}
                                 </td>
                             </tr>
