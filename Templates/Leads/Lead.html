@@ -14,6 +14,129 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='Css/home.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='Css/dashboard.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='Css/customer.css') }}">
+    <style>
+        /* Premium Table Enhancements */
+        .customer-table {
+            border-collapse: separate;
+            border-spacing: 0 8px; /* Give rows some vertical breathing room */
+            width: 100%;
+            margin-top: -8px;
+        }
+        
+        .customer-table thead th {
+            background: #f8fafc;
+            padding: 1.25rem 1rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #64748b;
+            border: none;
+            font-weight: 700;
+        }
+
+        .customer-table tbody tr {
+            background: #ffffff;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+
+        .customer-table tbody tr:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(13, 27, 42, 0.08);
+            z-index: 5;
+            position: relative;
+        }
+
+        .customer-table td {
+            padding: 1.25rem 1rem;
+            border-top: 1px solid rgba(13, 27, 42, 0.05);
+            border-bottom: 1px solid rgba(13, 27, 42, 0.05);
+            vertical-align: middle;
+        }
+
+        .customer-table td:first-child {
+            border-left: 1px solid rgba(13, 27, 42, 0.05);
+            border-top-left-radius: 8px;
+            border-bottom-left-radius: 8px;
+        }
+
+        .customer-table td:last-child {
+            border-right: 1px solid rgba(13, 27, 42, 0.05);
+            border-top-right-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+
+        .lead-source-badge {
+            background: rgba(13, 27, 42, 0.06);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            letter-spacing: 0.02em;
+        }
+
+        .contact-info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.88rem;
+            transition: color 0.2s ease;
+        }
+
+        .contact-info-item:hover {
+            color: var(--accent-gold);
+        }
+
+        .contact-icon {
+            opacity: 0.6;
+            font-size: 1rem;
+            width: 16px;
+            text-align: center;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: nowrap;
+        }
+
+        .action-pill {
+            padding: 0.5rem 0.9rem;
+            font-size: 0.75rem;
+            letter-spacing: 0.02em;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 6px;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            font-size: 0.75rem;
+            letter-spacing: 0.02em;
+            border-radius: 6px;
+            font-weight: 700;
+            display: inline-block;
+            text-align: center;
+            min-width: 100px;
+        }
+
+        .convert-pill {
+            background: var(--accent-gold);
+            color: #fff !important;
+            border: 1px solid var(--accent-gold);
+            box-shadow: 0 2px 4px rgba(212, 175, 55, 0.2);
+        }
+
+        .convert-pill:hover {
+            background: #c5a037;
+            transform: scale(1.03);
+        }
+    </style>
 </head>
 
 <body class="dashboard-page">
@@ -50,7 +173,7 @@
 
     <main class="container">
 
-        {% with messages = get_flashed_messages(category_filter=["leadsuccess"]) %}
+        {% with messages = get_flashed_messages(category_filter=["leadssuccess"]) %}
         {% if messages %}
         {% for message in messages %}
         <div class="flash-message"
@@ -61,7 +184,7 @@
         {% endif %}
         {% endwith %}
 
-        {% with messages = get_flashed_messages(category_filter=["leaderror"]) %}
+        {% with messages = get_flashed_messages(category_filter=["leadserror"]) %}
         {% if messages %}
         {% for message in messages %}
         <div class="flash-message"
@@ -133,19 +256,11 @@
 
                 <div style="position: relative; flex: 1; max-width: 240px;">
                     <select id="statusFilter" class="form-control" style="padding: 0.7rem 1rem; height: auto; font-size: 0.9rem; border-radius: 8px; border: 1px solid rgba(13, 27, 42, 0.15); background-color: #f8fafc; cursor: pointer; width: 100%;">
-                        <option value="">All Lead Stages</option>
+                        <option value="">All Lead Statuses</option>
                         <option value="New">New</option>
-                        <option value="Requirement Understood">Requirement Understood</option>
-                        <option value="Measurement Scheduled">Measurement Scheduled</option>
-                        <option value="Quotation Sent">Quotation Sent</option>
-                        <option value="Follow Up">Follow Up</option>
-                        <option value="Order Confirmed">Order Confirmed</option>
-                        <option value="In Production">In Production</option>
-                        <option value="Ready for Dispatch">Ready for Dispatch</option>
-                        <option value="Installation Scheduled">Installation Scheduled</option>
-                        <option value="Installation Done">Installation Done</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Prospect">Prospect</option>
                     </select>
                 </div>
             </div>
@@ -161,9 +276,12 @@
                 <table class="customer-table" id="leadsTable">
                     <thead>
                         <tr>
+                            <th>#</th>
                             <th>Name</th>
                             <th>Contact Info</th>
                             <th>Company</th>
+                            <th>City</th>
+                            <th>Address</th>
                             <th>Source</th>
                             <th>Stage / Status</th>
                             <th>Assigned To</th>
@@ -173,52 +291,70 @@
                     <tbody>
                         {% for lead in leads %}
                         <tr>
-                            <td class="customer-name" style="font-weight: 600;">{{ lead.name }}</td>
+                            <td>#{{ loop.index }}</td>
+                            <td class="customer-name" style="font-weight: 700; color: var(--primary-color);">{{ lead.name }}</td>
                             <td>
-                                <div style="display:flex; flex-direction: column; gap: 4px;">
-                                    <span style="font-size: 0.85rem; color: var(--primary-color);">✉ {{ lead.email }}</span>
-                                    <span style="font-size: 0.85rem; color: #666;">📞 {{ lead.phone_number }}</span>
+                                <div style="display:flex; flex-direction: column; gap: 8px;">
+                                    <div class="contact-info-item">
+                                        <span class="contact-icon">✉</span>
+                                        <span style="font-weight: 500;">{{ lead.email }}</span>
+                                    </div>
+                                    <div class="contact-info-item">
+                                        <span class="contact-icon">📱</span>
+                                        <span style="color: #64748b;">{{ lead.phone_number }}</span>
+                                    </div>
                                 </div>
                             </td>
-                            <td>{{ lead.company or '—' }}</td>
-                            <td class="lead-source">
-                                <span style="background: rgba(13, 27, 42, 0.05); padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 500;">
-                                    {{ lead.source.value if lead.source else 'Unknown' }}
+                            <td style="font-weight: 500; color: #475569;">{{ lead.company or '—' }}</td>
+                            <td style="font-weight: 500; color: #475569;">{{ lead.city or '—' }}</td>
+                            <td style="font-weight: 400; color: #64748b; font-size: 0.85rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ lead.address }}">
+                                {{ lead.address or '—' }}
+                            </td>
+                            <td>
+                                <span class="lead-source-badge">
+                                    {{ lead.source.value if lead.source else 'Other' }}
                                 </span>
                             </td>
                             <td>
-                                {% set active_stages = ['Completed', 'Installation Done', 'Installation Scheduled', 'Ready for Dispatch', 'In Production', 'Order Confirmed'] %}
-                                {% set warning_stages = ['Requirement Understood', 'Measurement Scheduled', 'Quotation Sent', 'Follow Up'] %}
-                                
-                                {% if lead.status_display in active_stages %}
-                                <span class="status-badge status-active">{{ lead.status_display }}</span>
-                                {% elif lead.status_display == 'Cancelled' %}
-                                <span class="status-badge" style="background: rgba(220, 53, 69, 0.1); color: #dc3545; border-color: rgba(220, 53, 69, 0.2);">{{ lead.status_display }}</span>
-                                {% elif lead.status_display in warning_stages %}
-                                <span class="status-badge status-pending" style="color: #b45309; background: #fef3c7; border-color: #fde68a;">{{ lead.status_display }}</span>
+                                {% if lead.status_display == 'Active' %}
+                                <span class="status-badge status-active">Active</span>
+                                {% elif lead.status_display == 'New' %}
+                                <span class="status-badge" style="background: rgba(14, 165, 233, 0.08); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.2);">New</span>
+                                {% elif lead.status_display == 'Prospect' %}
+                                <span class="status-badge" style="color: #b45309; background: #fffbeb; border: 1px solid #fde68a;">Prospect</span>
+                                {% elif lead.status_display == 'Inactive' %}
+                                <span class="status-badge" style="background: rgba(100, 116, 139, 0.08); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.2);">Inactive</span>
                                 {% else %}
                                 <span class="status-badge status-pending">{{ lead.status_display }}</span>
                                 {% endif %}
                                 <span class="raw-status" style="display:none;">{{ lead.status_display }}</span>
                             </td>
-                            <td class="customer-assignee">
+                            <td class="customer-assignee" style="font-weight: 500;">
                                 {% if lead.assignee %}
-                                    {{ lead.assignee.name }}
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <div style="width: 24px; height: 24px; background: rgba(13, 27, 42, 0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: var(--primary-color);">{{ lead.assignee.name[0] }}</div>
+                                        {{ lead.assignee.name }}
+                                    </div>
                                 {% else %}
-                                    <span style="opacity: 0.6; font-style: italic;">Unassigned</span>
+                                    <span style="opacity: 0.5; font-style: italic; font-size: 0.85rem;">Unassigned</span>
                                 {% endif %}
                             </td>
                             <td>
                                 <div class="action-buttons">
-                                    <a href="/view-lead/{{ lead.id }}" class="action-pill" style="background: rgba(212, 175, 55, 0.1); color: var(--accent-gold); border: 1px solid rgba(212, 175, 55, 0.2);">👁 View</a>
-                                    <a href="/edit-lead/{{ lead.id }}" class="action-pill edit-pill">✏ Edit</a>
+                                    <a href="/view-lead/{{ lead.id }}" class="action-pill" style="background: rgba(212, 175, 55, 0.08); color: var(--accent-gold); border: 1px solid rgba(212, 175, 55, 0.15);" title="View Details">👁 View</a>
+                                    <a href="/edit-lead/{{ lead.id }}" class="action-pill edit-pill" title="Edit Lead">✏ Edit</a>
                                     <form action="/delete-lead/{{ lead.id }}" method="POST"
                                         style="display:inline;"
                                         onsubmit="return confirm('Are you sure you want to delete this lead?');">
-                                        <button type="submit" class="action-pill delete-pill">🗑 Delete</button>
+                                        <button type="submit" class="action-pill delete-pill" title="Delete">🗑 Delete</button>
                                     </form>
                                     {% if not lead.converted_customer %}
-                                    <a href="/convert-lead/{{ lead.id }}" class="action-pill gold" style="background: var(--accent-gold); color: white; border: none;" title="Convert to Customer">▶ Convert</a>
+                                    <a href="/convert-lead/{{ lead.id }}" 
+                                       class="action-pill convert-pill" 
+                                       title="Convert to Customer"
+                                       onclick="return confirm('🚀 Are you sure you want to convert this lead into an active customer? This will validate data and create a new customer record.');">
+                                       🚀 Convert
+                                    </a>
                                     {% endif %}
                                 </div>
                             </td>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Bulk Customer | GlassEntials Staff Portal</title>
+    <title>Bulk Upload Leads | GlassEntials Staff Portal</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,8 +32,8 @@
 
         <nav class="dash-menu">
             <a href="{{ url_for('home_page') }}">Dashboard</a>
-            <a href="{{ url_for('customers') }}" class="active">Customers</a>
-            <a href="{{ url_for('leads') }}">Leads</a>
+            <a href="{{ url_for('customers') }}">Customers</a>
+            <a href="{{ url_for('leads') }}" class="active">Leads</a>
             <a href="#">Deals</a>
             <a href="#">Tasks</a>
             <div class="dropdown">
@@ -53,11 +53,11 @@
     <main class="container" style="max-width: 1000px; padding-top: 3rem;">
         <!-- Top Section -->
         <div class="top-bar" style="border-bottom: 2px solid rgba(212, 175, 55, 0.2); padding-bottom: 1.5rem; margin-bottom: 2rem;">
-            <h1 style="color: var(--primary-color); font-size: 2rem; font-family: var(--font-heading);">Bulk Upload Customers</h1>
-            <a href="{{ url_for('customers') }}" class="btn-action outline" style="text-decoration:none;">← Back to Customers</a>
+            <h1 style="color: var(--primary-color); font-size: 2rem; font-family: var(--font-heading);">Bulk Upload Leads</h1>
+            <a href="{{ url_for('leads') }}" class="btn-action outline" style="text-decoration:none;">← Back to Leads</a>
         </div>
         <!-- Flash Messages -->
-        {% with messages = get_flashed_messages(category_filter=["customersuccess"]) %}
+        {% with messages = get_flashed_messages(category_filter=["leadssuccess"]) %}
           {% if messages %}
             {% for message in messages %}
             <div class="flash-message" style="padding: 15px; background-color: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; font-family: var(--font-body); color: var(--primary-color); display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem; border-radius: 4px;">
@@ -67,7 +67,7 @@
           {% endif %}
         {% endwith %}
 
-        {% with messages = get_flashed_messages(category_filter=["customererror"]) %}
+        {% with messages = get_flashed_messages(category_filter=["leadserror"]) %}
           {% if messages %}
             {% for message in messages %}
             <div class="flash-message" style="padding: 15px; background-color: rgba(139, 0, 0, 0.04); border-left: 4px solid rgba(139, 0, 0, 0.5); font-family: var(--font-body); color: #8b0000; display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem; border-radius: 4px;">
@@ -86,9 +86,9 @@
                 </div>
                 <h2 style="font-family: var(--font-heading); color: var(--primary-color); margin-bottom: 1rem; font-size: 1.5rem;">Download Template</h2>
                 <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6; margin-bottom: 2rem; max-width: 250px;">
-                    Use our standard format to ensure your customer data is imported correctly.
+                    Use our standard format to ensure your lead data is imported correctly.
                 </p>
-                <a href="{{ url_for('download_template') }}" class="btn-action outline" style="width: 100%; justify-content: center; text-decoration: none; padding: 1rem;">
+                <a href="{{ url_for('download_lead_template') }}" class="btn-action outline" style="width: 100%; justify-content: center; text-decoration: none; padding: 1rem;">
                     Download CSV Format
                 </a>
                 <div style="margin-top: 1.5rem; text-align: left; width: 100%; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 1.5rem;">
@@ -97,7 +97,7 @@
                         <li>Name (Required)</li>
                         <li>Email (Required)</li>
                         <li>Phone (Required)</li>
-                        <li>Status (Optional: New, Requirement Understood, Measurement Scheduled, Quotation Sent, Follow Up, Order Confirmed, In Production, Ready for Dispatch, Installation Scheduled, Installation Done, Completed, Cancelled)</li>
+                        <li>Status (Optional: New, Active, Inactive, Prospect)</li>
                         <li>Source (Optional: Website, Google, Referral, etc.)</li>
                     </ul>
                 </div>
@@ -108,15 +108,15 @@
                 <div style="position: absolute; top: -10%; right: -10%; width: 200px; height: 200px; background: rgba(212, 175, 55, 0.05); border-radius: 50%; pointer-events: none;"></div>
                 
                 <h2 style="font-family: var(--font-heading); color: var(--accent-gold); margin-bottom: 0.5rem; font-size: 1.5rem;">Upload File</h2>
-                <p style="color: rgba(255,255,255,0.7); font-size: 0.95rem; margin-bottom: 2rem;">Ready to import? Upload your completed CSV file below.</p>
+                <p style="color: rgba(255,255,255,0.7); font-size: 0.95rem; margin-bottom: 2rem;">Ready to import? Upload your completed .csv file below.</p>
                 
-                <form action="{{ url_for('bulk_upload') }}" method="POST" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 20px; position: relative; z-index: 1;">
+                <form action="{{ url_for('bulk_upload_leads') }}" method="POST" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 20px; position: relative; z-index: 1;">
                     <div class="file-drop-area" style="position: relative; border: 2px dashed rgba(212, 175, 55, 0.4); border-radius: 8px; padding: 3rem 1.5rem; text-align: center; background: rgba(255, 255, 255, 0.03); transition: all 0.3s ease; cursor: pointer;">
                         <span style="font-size: 2rem; display: block; margin-bottom: 1rem;">📁</span>
-                        <label for="customer_file" style="color: #fff; font-weight: 500; cursor: pointer; display: block;">
+                        <label for="lead_file" style="color: #fff; font-weight: 500; cursor: pointer; display: block;">
                             <span style="color: var(--accent-gold); text-decoration: underline;">Browse</span> or drag file here
                         </label>
-                        <input type="file" id="customer_file" name="customer_file" accept=".csv" required style="opacity: 0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;">
+                        <input type="file" id="lead_file" name="lead_file" accept=".csv" required style="opacity: 0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;">
                         <div id="file-name" style="margin-top: 1rem; font-size: 0.85rem; color: var(--accent-gold); font-weight: 500;">No file selected</div>
                     </div>
                     
@@ -132,7 +132,7 @@
 
         <script>
             // Simple file name display
-            document.getElementById('customer_file').addEventListener('change', function(e) {
+            document.getElementById('lead_file').addEventListener('change', function(e) {
                 const fileName = e.target.files[0] ? e.target.files[0].name : "No file selected";
                 document.getElementById('file-name').textContent = fileName;
                 

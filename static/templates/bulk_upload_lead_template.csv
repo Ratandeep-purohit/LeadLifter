@@ -1,0 +1,4 @@
+Name,Email,Phone,Company,Source,Status,Assigned_To
+John Doe,john@example.com,1234567890,Doe Industries,Website,New,admin@glassentials.com
+Jane Smith,jane@example.com,0987654321,Modern Glass,Referral,Active,
+Rahul Verma,rahul@example.com,9999888877,,Google,Prospect,

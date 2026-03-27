@@ -3,6 +3,7 @@ from flask_login import UserMixin
 from enum import Enum
 from datetime import datetime
 
+
 db = SQLAlchemy()
 
 # --- ENUM DEFINITIONS ---
@@ -13,7 +14,13 @@ class UserRole(Enum):
     EMPLOYEE = "employee"
 
 class LeadStatus(Enum):
-    NEW = "New"  # Added as starting point
+    NEW = "New"
+    ACTIVE = "Active"
+    INACTIVE = "Inactive"
+    PROSPECT = "Prospect"
+
+class CustomerStatus(Enum):
+    NEW = "New"
     REQUIREMENT_UNDERSTOOD = "Requirement Understood"
     MEASUREMENT_SCHEDULED = "Measurement Scheduled"
     QUOTATION_SENT = "Quotation Sent"
@@ -25,12 +32,6 @@ class LeadStatus(Enum):
     INSTALLATION_DONE = "Installation Done"
     COMPLETED = "Completed"
     CANCELLED = "Cancelled"
-
-class CustomerStatus(Enum):
-    NEW = "New"
-    ACTIVE = "Active"
-    INACTIVE = "Inactive"
-    PROSPECT = "Prospect"
 
 class LeadSource(Enum):
     WEBSITE = "Website"
@@ -55,7 +56,7 @@ class User(db.Model, UserMixin):
     password = db.Column(db.String(255), nullable=False) # Supports Argon2/BCrypt hashes
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     phone_number = db.Column(db.String(20), unique=True, nullable=True)
-    role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.EMPLOYEE)
+    role = db.Column(db.Enum(UserRole, values_callable=lambda x: [e.value for e in x]), nullable=False, default=UserRole.EMPLOYEE)
     
     # 1-to-1 relationship with Employee profile
     employee = db.relationship('Employee', back_populates='user', uselist=False, cascade="all, delete-orphan")
@@ -93,9 +94,11 @@ class Lead(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     phone_number = db.Column(db.String(20), unique=True, nullable=False)
     company = db.Column(db.String(100), nullable=True)
-    source = db.Column(db.Enum(LeadSource), default=LeadSource.OTHER)
-    status = db.Column(db.Enum(LeadStatus), default=LeadStatus.NEW, index=True)
+    source = db.Column(db.Enum(LeadSource, values_callable=lambda x: [e.value for e in x]), default=LeadSource.OTHER)
+    status = db.Column(db.Enum(LeadStatus, values_callable=lambda x: [e.value for e in x]), default=LeadStatus.NEW, index=True)
     notes = db.Column(db.Text, nullable=True)
+    address = db.Column(db.String(255), nullable=True)
+    city = db.Column(db.String(100), nullable=True)
     
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
@@ -128,8 +131,8 @@ class Customer(db.Model):
     address = db.Column(db.String(200), nullable=True)
     city = db.Column(db.String(50), nullable=True)
     company = db.Column(db.String(100), nullable=True)
-    source = db.Column(db.Enum(LeadSource), default=LeadSource.OTHER)
-    status = db.Column(db.Enum(CustomerStatus), default=CustomerStatus.ACTIVE, index=True)
+    source = db.Column(db.Enum(LeadSource, values_callable=lambda x: [e.value for e in x]), default=LeadSource.OTHER)
+    status = db.Column(db.Enum(CustomerStatus, values_callable=lambda x: [e.value for e in x]), default=CustomerStatus.NEW, index=True)
     notes = db.Column(db.Text, nullable=True)
     
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
@@ -157,7 +160,7 @@ class Customer(db.Model):
 class LeadActivity(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lead_id = db.Column(db.Integer, db.ForeignKey('lead.id'), nullable=False, index=True)
-    activity_type = db.Column(db.Enum(ActivityType), nullable=False)
+    activity_type = db.Column(db.Enum(ActivityType, values_callable=lambda x: [e.value for e in x]), nullable=False)
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     created_by = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False, index=True)

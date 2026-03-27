@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ customer.name }} | Customer Profile</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='Css/home.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='Css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='Css/customer.css') }}">
+    <style>
+        .profile-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 20px;
+        }
+        
+        .profile-header {
+            background: #fff;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.02);
+            border: 1px solid rgba(13, 27, 42, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-top: 5px solid var(--accent-gold);
+        }
+
+        .profile-identity {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .identity-avatar {
+            width: 70px;
+            height: 70px;
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: var(--font-heading);
+        }
+
+        .identity-text h1 {
+            font-size: 1.8rem;
+            margin: 0;
+            color: var(--primary-color);
+        }
+
+        .identity-text span {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            display: block;
+            margin-top: 4px;
+        }
+
+        .profile-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .details-panel {
+            background: #fff;
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid rgba(13, 27, 42, 0.05);
+        }
+
+        .panel-section-title {
+            font-family: var(--font-heading);
+            font-size: 1.1rem;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px solid rgba(13, 27, 42, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-row {
+            display: flex;
+            margin-bottom: 1.2rem;
+            font-size: 0.95rem;
+        }
+
+        .info-label {
+            width: 140px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: var(--primary-color);
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .notes-box {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-gold);
+            color: var(--primary-color);
+            line-height: 1.6;
+            margin-top: auto;
+        }
+
+        /* Tabs Styling */
+        .tabs-container {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid rgba(13, 27, 42, 0.05);
+            overflow: hidden;
+        }
+
+        .tab-nav {
+            display: flex;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid rgba(13, 27, 42, 0.05);
+        }
+
+        .tab-btn {
+            padding: 1.2rem 2rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-muted);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .tab-btn:hover {
+            color: var(--primary-color);
+        }
+
+        .tab-btn.active {
+            color: var(--primary-color);
+            background: #fff;
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--accent-gold);
+        }
+
+        .tab-content {
+            padding: 2.5rem;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Status Badge override */
+        .badge-large {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body class="dashboard-page">
+    <header class="dash-nav">
+        <div class="logo">
+            <a href="/home" class="logo-link">
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="GlassEntials Logo" class="site-logo">
+            </a>
+            <span class="crm-badge">Staff Dashboard</span>
+        </div>
+        <nav class="dash-menu">
+            <a href="{{ url_for('home_page') }}">Dashboard</a>
+            <a href="{{ url_for('customers') }}" class="active">Customers</a>
+            <a href="{{ url_for('leads') }}">Leads</a>
+            <a href="#">Deals</a>
+            <a href="#">Tasks</a>
+            <div class="dropdown">
+                <a href="#">Settings ▾</a>
+                <div class="dropdown-content">
+                    <a href="{{ url_for('employee') }}">Employee Portal</a>
+                </div>
+            </div>
+        </nav>
+        <div class="user-profile" style="display:flex; align-items:center; gap: 15px;">
+            <span style="font-weight: 600; font-size: 0.95rem; color: var(--primary-color);">Welcome, {{ current_user.username }}</span>
+            <a href="{{ url_for('logout') }}" class="btn-action outline" style="padding: 0.5rem 1rem;">Logout</a>
+        </div>
+    </header>
+
+    <main class="profile-container">
+        <!-- Breadcrumbs -->
+        <div style="margin-bottom: 1.5rem; font-size: 0.9rem; color: var(--text-muted);">
+            <a href="{{ url_for('customers') }}" style="color: var(--accent-gold); text-decoration: none;">Customers</a> / Customer Profile
+        </div>
+
+        <!-- Header -->
+        <section class="profile-header">
+            <div class="profile-identity">
+                <div class="identity-avatar">
+                   {{ customer.name[0] | upper }}
+                </div>
+                <div class="identity-text">
+                    <h1>{{ customer.name }}</h1>
+                    <span>Customer ID: #{{ customer.id }} • Added on {{ customer.created_at.strftime('%d %b, %Y') }}</span>
+                </div>
+            </div>
+            
+            <div class="profile-actions">
+                <div style="margin-right: 1.5rem; display:flex; align-items:center;">
+                    {% set active_stages = ['Completed', 'Installation Done', 'Installation Scheduled', 'Ready for Dispatch', 'In Production', 'Order Confirmed'] %}
+                    {% set warning_stages = ['Requirement Understood', 'Measurement Scheduled', 'Quotation Sent', 'Follow Up'] %}
+                    
+                    {% if customer.status_display in active_stages %}
+                    <span class="status-badge status-active badge-large">{{ customer.status_display }}</span>
+                    {% elif customer.status_display == 'Cancelled' %}
+                    <span class="status-badge badge-large" style="background: rgba(220, 53, 69, 0.08); color: #dc3545; border: 1px solid rgba(220, 53, 69, 0.2);">{{ customer.status_display }}</span>
+                    {% elif customer.status_display in warning_stages %}
+                    <span class="status-badge badge-large" style="color: #b45309; background: #fffbeb; border: 1px solid #fde68a;">{{ customer.status_display }}</span>
+                    {% else %}
+                    <span class="status-badge status-pending badge-large">{{ customer.status_display }}</span>
+                    {% endif %}
+                </div>
+                <a href="{{ url_for('edit_customer', customer_id=customer.id) }}" class="btn-action outline" style="text-decoration: none;">
+                    ✏ Edit Profile
+                </a>
+                <form action="{{ url_for('delete_customer', customer_id=customer.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Permanently delete this customer?');">
+                    <button type="submit" class="btn-action dark" style="background: #dc3545; color: white;">🗑 Delete</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Information Grid -->
+        <div class="profile-grid">
+            <!-- Contact & Company -->
+            <div class="details-panel" style="display: flex; flex-direction: column;">
+                <h2 class="panel-section-title"><span>🏠</span> Contact & Address Details</h2>
+                <div class="info-row">
+                    <div class="info-label">Email Address</div>
+                    <div class="info-value">{{ customer.email }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Phone Number</div>
+                    <div class="info-value">{{ customer.phone_number }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Full Address</div>
+                    <div class="info-value">{{ customer.address or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">City</div>
+                    <div class="info-value">{{ customer.city or '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Company</div>
+                    <div class="info-value">{{ customer.company or '—' }}</div>
+                </div>
+                
+                <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-top: 1.5rem; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 1px;">Project Notes</h3>
+                <div class="notes-box">
+                    {% if customer.notes %}
+                        {{ customer.notes }}
+                    {% else %}
+                        <span style="font-style: italic; opacity: 0.6;">No additional project notes available.</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Assignment & History -->
+            <div class="details-panel">
+                <h2 class="panel-section-title"><span>📊</span> Project assignment</h2>
+                <div class="info-row">
+                    <div class="info-label">Assigned To</div>
+                    <div class="info-value">
+                        {% if customer.assignee %}
+                            {{ customer.assignee.name }}
+                        {% else %}
+                            <span style="opacity: 0.5;">Unassigned</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Current Stage</div>
+                    <div class="info-value">{{ customer.status_display }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Lead Source</div>
+                    <div class="info-value">{{ customer.source.value if customer.source else 'Unknown' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Converted By</div>
+                    <div class="info-value">{{ customer.creator.name if customer.creator else 'System' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Last Updated</div>
+                    <div class="info-value">{{ customer.updated_at.strftime('%d %b, %Y %H:%M') if customer.updated_at else 'N/A' }}</div>
+                </div>
+
+                <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(16, 185, 129, 0.05); border-radius: 8px; border: 1px dashed #10b981;">
+                    <p style="margin: 0; font-size: 0.9rem; color: var(--primary-color); font-weight: 500;">
+                        {% if customer.lead_id %}
+                            🔗 This customer was converted from a Lead.
+                            <br><a href="/view-lead/{{ customer.lead_id }}" style="color: #10b981; font-weight: 700; display: inline-block; margin-top: 8px;">View Original Lead →</a>
+                        {% else %}
+                            ✨ This customer was created directly.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lower Tabs Section -->
+        <div class="tabs-container">
+            <div class="tab-nav">
+                <button class="tab-btn active" onclick="openTab(event, 'overview')">Project Timeline</button>
+                <button class="tab-btn" onclick="openTab(event, 'tasks')">Tasks related to customer</button>
+            </div>
+
+            <div id="overview" class="tab-content active">
+                <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.2;">📜</div>
+                    <h3>Project History</h3>
+                    <p>Track measurement status, production updates, and installation history. (Timeline coming soon)</p>
+                </div>
+            </div>
+
+            <div id="tasks" class="tab-content">
+                <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.2;">📅</div>
+                    <h3>Tasks Related to Customer</h3>
+                    <p>Schedule measurements or installation visits for {{ customer.name }}. (Task Module coming soon)</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+                tabcontent[i].classList.remove("active");
+            }
+            tablinks = document.getElementsByClassName("tab-btn");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.className += " active";
+        }
+    </script>
+</body>
+</html>

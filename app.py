@@ -45,7 +45,15 @@ def about():
 @login_required
 def home_page():
     all_customers = Customer.query.filter_by(is_deleted=False).order_by(Customer.created_at.desc()).all()
-    return render_template('Home/home.html', all_customers=all_customers)
+    recent_leads = Lead.query.filter_by(is_deleted=False).order_by(Lead.created_at.desc()).limit(5).all()
+    total_leads = Lead.query.filter_by(is_deleted=False).count()
+    return render_template('Home/home.html', all_customers=all_customers, recent_leads=recent_leads, total_leads=total_leads)
+
+@app.route('/view-customer/<int:customer_id>')
+@login_required
+def view_customer(customer_id):
+    customer = Customer.query.get_or_404(customer_id)
+    return render_template('customer/customer_profile.html', customer=customer)
 
 @app.route('/logout')
 @login_required
@@ -391,7 +399,7 @@ def add_customer():
             city=city,
             company=company,
             source=source_map.get(source, LeadSource.OTHER),
-            status=status_map.get(status, CustomerStatus.NEW),
+            status=status_map.get(status, CustomerStatus.REQUIREMENT_UNDERSTOOD), # Changed default status
             notes=notes,
             created_by=current_user.employee.id,
             assigned_to=assigned_to_id
@@ -486,37 +494,59 @@ def bulk_upload():
             flash('No file uploaded.', 'customererror')
             return redirect(url_for('bulk_upload'))
         try:
-            df = pd.read_csv(file)
-            required_columns = {'Name', 'Email', 'Phone', 'Address', 'City', 'Company', 'Source', 'Status'}
-            if not required_columns.issubset(df.columns):
-                flash(f'Missing required columns: {", ".join(required_columns)}', 'customererror')
+            df = pd.read_csv(file).fillna('')
+            # Case-insensitive column search
+            col_map = {c.lower(): c for c in df.columns}
+            
+            req_check = {'name', 'email', 'phone'}
+            if not req_check.issubset(set(col_map.keys())):
+                flash(f'Missing required columns: {", ".join(req_check)}', 'customererror')
                 return redirect(url_for('bulk_upload'))
-            for _, row in df.iterrows():
-                name = str(row.get('Name', '')).strip()
-                email = str(row.get('Email', '')).strip()
-                phone_number = re.sub(r'\D', '', str(row.get('Phone', '')))  # strip non-digits
-                address = str(row.get('Address', '')).strip()
-                city = str(row.get('City', '')).strip()
-                company = str(row.get('Company', '')).strip()
-                source = str(row.get('Source', '')).strip()
-                status = str(row.get('Status', '')).strip()
-                
-                # Assign to employee by email; fall back to uploader's employee
-                assigned_to_email = str(row.get('Assigned_To', '')).strip()
-                assigned_to_id = current_user.employee.id  # default
-                if assigned_to_email:
-                    assigned_emp = Employee.query.join(User).filter(User.email == assigned_to_email).first()
-                    if assigned_emp:
-                        assigned_to_id = assigned_emp.id
+            
+            success_count = 0
+            errors = []
+            source_map = {e.value.lower(): e for e in LeadSource}
+            status_map = {e.value.lower(): e for e in CustomerStatus}
+            
+            for idx, row in df.iterrows():
+                row_num = idx + 2
+                # Helper to get column regardless of case
+                def get_val(key):
+                    c = col_map.get(key.lower())
+                    return str(row[c]).strip() if c else ''
 
-                if not all([name, email, phone_number]):
-                    continue  # skip invalid rows
+                name = get_val('name')
+                email = get_val('email')
+                phone_raw = get_val('phone')
+                # Handle floats like 123.0 -> 123
+                if phone_raw.endswith('.0'): phone_raw = phone_raw[:-2]
+                phone_number = re.sub(r'\D', '', phone_raw)
+                
+                address = get_val('address')
+                city = get_val('city')
+                company = get_val('company')
+                source_str = get_val('source').lower()
+                status_str = get_val('status').lower()
+                
+                assigned_to_email = get_val('assigned_to')
+                assigned_to_id = current_user.employee.id
+                if assigned_to_email and assigned_to_email.lower() not in ['', 'nan', 'none']:
+                    assigned_emp = Employee.query.join(User).filter(User.email == assigned_to_email).first()
+                    if assigned_emp: assigned_to_id = assigned_emp.id
+
+                if not all([name, email, phone_number]) or name.lower() == 'nan':
+                    errors.append(f"Row {row_num}: Fields missing")
+                    continue
                 if len(phone_number) != 10:
-                    continue  # skip invalid phone numbers
+                    errors.append(f"Row {row_num}: Phone not 10 digits ({phone_number})")
+                    continue
                 if Customer.query.filter_by(email=email, is_deleted=False).first():
-                    continue  # skip duplicates
-                source_map = {e.value: e for e in LeadSource}
-                status_map = {e.value: e for e in CustomerStatus}
+                    errors.append(f"Row {row_num}: Email duplicate")
+                    continue
+                if Customer.query.filter_by(phone_number=phone_number, is_deleted=False).first():
+                    errors.append(f"Row {row_num}: Phone duplicate")
+                    continue
+                    
                 new_customer = Customer(
                     name=name,
                     email=email,
@@ -524,15 +554,29 @@ def bulk_upload():
                     address=address,
                     city=city,
                     company=company,
-                    source=source_map.get(source, LeadSource.OTHER),
-                    status=status_map.get(status, CustomerStatus.NEW),
+                    source=source_map.get(source_str, LeadSource.OTHER),
+                    status=status_map.get(status_str, CustomerStatus.NEW),
                     created_by=current_user.employee.id,
                     assigned_to=assigned_to_id
                 )
                 db.session.add(new_customer)
-            db.session.commit()
-            flash('Bulk upload successful!', 'customersuccess')
-            return redirect(url_for('customers'))
+                success_count += 1
+            
+            if success_count > 0:
+                db.session.commit()
+                if errors:
+                    msg = f"Imported {success_count}. Issues: " + ", ".join(errors[:3])
+                    if len(errors) > 3: msg += "..."
+                    flash(msg, 'customersuccess')
+                else:
+                    flash(f'Successfully imported {success_count} customers!', 'customersuccess')
+                return redirect(url_for('customers'))
+            else:
+                if errors:
+                    msg = "No customers imported. Issues: " + ", ".join(errors[:3])
+                    if len(errors) > 3: msg += "..."
+                    flash(msg, 'customererror')
+                return redirect(url_for('bulk_upload'))
         except Exception as e:
             db.session.rollback()
             flash(f'Error processing file: {str(e)}', 'customererror')
@@ -643,6 +687,12 @@ def leads():
     all_employees = Employee.query.filter_by(is_deleted=False).all()
     # Get unique status/sources from Enum for filters? Actually Enum is fine, we can hardcode filters in template.
     return render_template('Leads/Lead.html', leads=all_leads, employees=all_employees)
+
+@app.route('/view-lead/<int:lead_id>')
+@login_required
+def view_lead(lead_id):
+    lead = Lead.query.get_or_404(lead_id)
+    return render_template('Leads/lead_profile.html', lead=lead)
 @app.route('/add-lead', methods=['GET', 'POST'])
 @login_required
 def add_lead():
@@ -653,7 +703,9 @@ def add_lead():
         company = request.form.get('company')
         source = request.form.get('source')
         status = request.form.get('status')
-        notes = request.form.get('notes')
+        address = request.form.get('address')
+        city = request.form.get('city')
+        notes = request.form.get('notes', '').strip()
         assigned_to_id = request.form.get('assigned_to')
         if not assigned_to_id or assigned_to_id == 'unassigned':
             assigned_to_id = None
@@ -682,6 +734,8 @@ def add_lead():
             source=source_map.get(source, LeadSource.OTHER),
             status=status_map.get(status, LeadStatus.NEW),
             notes=notes,
+            address=address,
+            city=city,
             created_by=current_user.employee.id,
             assigned_to=assigned_to_id
         )
@@ -708,6 +762,8 @@ def edit_lead(lead_id):
         company = request.form.get('company', '').strip()
         source = request.form.get('source', '').strip()
         status = request.form.get('status', '').strip()
+        address = request.form.get('address', '').strip()
+        city = request.form.get('city', '').strip()
         notes = request.form.get('notes', '').strip()
         assigned_to_id = request.form.get('assigned_to')
         if not assigned_to_id or assigned_to_id == 'unassigned':
@@ -736,6 +792,8 @@ def edit_lead(lead_id):
         lead.company = company
         lead.source = source_map.get(source, LeadSource.OTHER)
         lead.status = status_map.get(status, LeadStatus.NEW)
+        lead.address = address
+        lead.city = city
         lead.notes = notes
         lead.assigned_to = assigned_to_id
         lead.updated_by = current_user.employee.id
@@ -932,5 +990,156 @@ def export_leads(format):
         )
     flash('Invalid format or export error.', 'leadserror')
     return redirect(url_for('leads'))
+@app.route('/download-lead-template')
+@login_required
+def download_lead_template():
+    template_path = 'static/templates/bulk_upload_lead_template.csv'
+    return send_file(template_path, as_attachment=True, download_name='bulk_upload_lead_template.csv')
+
+@app.route('/bulk-upload-leads', methods=['GET', 'POST'])
+@login_required
+def bulk_upload_leads():
+    if request.method == 'POST':
+        file = request.files.get('lead_file')
+        if not file:
+            flash('No file uploaded.', 'leadserror')
+            return redirect(url_for('bulk_upload_leads'))
+        try:
+            df = pd.read_csv(file).fillna('')
+            col_map = {c.lower(): c for c in df.columns}
+            
+            req_check = {'name', 'email', 'phone'}
+            if not req_check.issubset(set(col_map.keys())):
+                flash(f'Missing required columns: name, email, phone', 'leadserror')
+                return redirect(url_for('bulk_upload_leads'))
+            
+            success_count = 0
+            errors = []
+            source_map = {e.value.lower(): e for e in LeadSource}
+            status_map = {e.value.lower(): e for e in LeadStatus}
+            
+            for idx, row in df.iterrows():
+                row_num = idx + 2
+                def get_val(key):
+                    c = col_map.get(key.lower())
+                    return str(row[c]).strip() if c else ''
+
+                name = get_val('name')
+                email = get_val('email')
+                phone_raw = get_val('phone')
+                if phone_raw.endswith('.0'): phone_raw = phone_raw[:-2]
+                phone_number = re.sub(r'\D', '', phone_raw)
+                
+                company = get_val('company')
+                source_str = get_val('source').lower()
+                status_str = get_val('status').lower()
+                
+                assigned_to_email = get_val('assigned_to')
+                assigned_to_id = current_user.employee.id
+                if assigned_to_email and assigned_to_email.lower() not in ['', 'nan', 'none']:
+                    assigned_emp = Employee.query.join(User).filter(User.email == assigned_to_email).first()
+                    if assigned_emp: assigned_to_id = assigned_emp.id
+
+                if not all([name, email, phone_number]) or name.lower() == 'nan':
+                    errors.append(f"Row {row_num}: Fields missing")
+                    continue  
+                if len(phone_number) != 10:
+                    errors.append(f"Row {row_num}: Phone not 10 digits ({phone_number})")
+                    continue  
+                if Lead.query.filter_by(email=email, is_deleted=False).first():
+                    errors.append(f"Row {row_num}: Email duplicate")
+                    continue  
+                if Lead.query.filter_by(phone_number=phone_number, is_deleted=False).first():
+                    errors.append(f"Row {row_num}: Phone duplicate")
+                    continue
+
+                new_lead = Lead(
+                    name=name,
+                    email=email,
+                    phone_number=phone_number,
+                    company=company,
+                    source=source_map.get(source_str, LeadSource.OTHER),
+                    status=status_map.get(status_str, LeadStatus.NEW),
+                    created_by=current_user.employee.id,
+                    assigned_to=assigned_to_id
+                )
+                db.session.add(new_lead)
+                success_count += 1
+            
+            if success_count > 0:
+                db.session.commit()
+                if errors:
+                    msg = f"Imported {success_count}. Issues: " + ", ".join(errors[:3])
+                    if len(errors) > 3: msg += "..."
+                    flash(msg, 'leadssuccess')
+                else:
+                    flash(f'Successfully imported {success_count} leads!', 'leadssuccess')
+                return redirect(url_for('leads'))
+            else:
+                if errors:
+                    msg = "No leads imported. Issues: " + ", ".join(errors[:3])
+                    if len(errors) > 3: msg += "..."
+                    flash(msg, 'leadserror')
+                return redirect(url_for('bulk_upload_leads'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error processing file: {str(e)}', 'leadserror')
+            return redirect(url_for('bulk_upload_leads'))
+    return render_template('Leads/bulkuploadleads.html')
+
+@app.route('/convert-lead/<int:lead_id>')
+@login_required
+def convert_lead(lead_id):
+    lead = Lead.query.get_or_404(lead_id)
+    
+    # Check if lead is already converted
+    if lead.converted_customer:
+        flash('This lead has already been converted to a customer.', 'leadserror')
+        return redirect(url_for('leads'))
+    
+    # Validate if customer already exists (by email or phone)
+    existing_customer = Customer.query.filter(
+        (Customer.email == lead.email) | (Customer.phone_number == lead.phone_number)
+    ).filter_by(is_deleted=False).first()
+    
+    if existing_customer:
+        # If exists, we still link them? User said "first validate that customer is exist or not"
+        # Usually we shouldn't create a duplicate. 
+        # I'll inform the user and suggest linking or erroring.
+        flash(f'Customer already exists with email {lead.email} or phone {lead.phone_number}.', 'leadserror')
+        return redirect(url_for('leads'))
+    
+    try:
+        # Create new Customer from Lead data
+        new_customer = Customer(
+            lead_id=lead.id,
+            name=lead.name,
+            email=lead.email,
+            phone_number=lead.phone_number,
+            address=lead.address,
+            city=lead.city,
+            company=lead.company,
+            source=lead.source,
+            status=CustomerStatus.NEW,
+            notes=lead.notes,
+            assigned_to=lead.assigned_to,
+            created_by=current_user.employee.id,
+            updated_by=current_user.employee.id
+        )
+        
+        # Update Lead status
+        lead.status = LeadStatus.ACTIVE
+        
+        db.session.add(new_customer)
+        db.session.commit()
+        
+        flash(f'Successfully converted lead "{lead.name}" to an active customer!', 'leadssuccess')
+        return redirect(url_for('customers'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error during conversion: {str(e)}', 'leadserror')
+        return redirect(url_for('leads'))
+
 if __name__ == '__main__':
     app.run(debug=True)
