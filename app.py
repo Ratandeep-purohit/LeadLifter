@@ -13,6 +13,7 @@ from routes.leads import leads_bp
 from routes.employees import employees_bp
 from routes.projects import projects_bp
 from routes.api import api_bp
+from routes.tasks import tasks_bp
 
 app = Flask(__name__, template_folder='Templates')
 app.config.from_object(Config)
@@ -60,6 +61,7 @@ app.register_blueprint(leads_bp)
 app.register_blueprint(employees_bp)
 app.register_blueprint(projects_bp)
 app.register_blueprint(api_bp)
+app.register_blueprint(tasks_bp)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -86,7 +88,7 @@ def about():
 @app.route('/home')
 @login_required
 def home_page():
-    from model import ActivityLog, Project
+    from model import ActivityLog, Project, Task, TaskStatus
     org_id = current_user.organization_id
     
     # Stats
@@ -95,6 +97,7 @@ def home_page():
     recent_projects = Project.query.filter_by(organization_id=org_id, is_deleted=False).order_by(Project.created_at.desc()).limit(5).all()
     total_leads = Lead.query.filter_by(organization_id=org_id, is_deleted=False).count()
     active_projects_count = Project.query.filter_by(organization_id=org_id, is_deleted=False).filter(Project.status != 'Completed').count()
+    pending_tasks_count = Task.query.filter_by(organization_id=org_id, status=TaskStatus.PENDING).count()
     
     # Activity logs
     recent_activity = ActivityLog.query.filter_by(organization_id=org_id).order_by(ActivityLog.created_at.desc()).limit(10).all()
@@ -105,6 +108,7 @@ def home_page():
                          recent_projects=recent_projects,
                          total_leads=total_leads,
                          active_projects_count=active_projects_count,
+                         pending_tasks_count=pending_tasks_count,
                          recent_activity=recent_activity)
 
 # Bulk Upload Templates (Shared Utilities)

@@ -64,6 +64,12 @@ class ActivityType(Enum):
     NOTE = "Note"
     TASK = "Task"
 
+class TaskStatus(Enum):
+    PENDING = "Pending"
+    IN_PROGRESS = "In Progress"
+    COMPLETED = "Completed"
+    CANCELLED = "Cancelled"
+
 class Organization(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -256,25 +262,35 @@ class LeadActivity(db.Model):
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    description = db.Column(db.String(255), nullable=False)
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text, nullable=True)
     due_date = db.Column(db.DateTime, nullable=True)
-    is_completed = db.Column(db.Boolean, default=False)
+    status = db.Column(db.Enum(TaskStatus, values_callable=lambda x: [e.value for e in x]), default=TaskStatus.PENDING, index=True)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
     
     # Multi-tenant field
     organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=True, index=True)
     
     # Foreign Keys
-    assigned_to = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False, index=True)
+    assigned_to = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=True, index=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     lead_id = db.Column(db.Integer, db.ForeignKey('lead.id'), nullable=True, index=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True, index=True)
     
     # Relationships
     assignee = db.relationship('Employee', foreign_keys=[assigned_to], backref=db.backref('tasks_assigned', lazy='dynamic'))
+    creator = db.relationship('User', foreign_keys=[created_by], backref=db.backref('tasks_created', lazy='dynamic'))
     lead_record = db.relationship('Lead', foreign_keys=[lead_id], backref=db.backref('tasks_related', lazy='dynamic'))
-    org = db.relationship('Organization', foreign_keys=[organization_id], backref=db.backref('tasks_org', lazy='dynamic'))
+    project = db.relationship('Project', foreign_keys=[project_id], backref=db.backref('tasks_related', lazy='dynamic'))
+    organization = db.relationship('Organization', foreign_keys=[organization_id], backref=db.backref('tasks', lazy='dynamic'))
+
+    @property
+    def status_display(self):
+        return self.status.value if self.status else ""
 
     def __repr__(self):
-        return f'<Task {self.description}>'
+        return f'<Task {self.title}>'
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
