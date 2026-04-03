@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Task | GlassEntials Staff Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/customer.css') }}">
+</head>
+<body class="dashboard-page">
+
+    <!-- Top Navbar -->
+    <header class="dash-nav">
+        <div class="logo">
+            <a href="/home" class="logo-link">
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="GlassEntials Logo" class="site-logo">
+            </a>
+        </div>
+
+        <nav class="dash-menu">
+            <a href="{{ url_for('home_page') }}">Dashboard</a>
+            <a href="{{ url_for('customers.customers_list') }}">Customers</a>
+            <a href="{{ url_for('leads.leads_list') }}">Leads</a>
+            <a href="{{ url_for('projects.projects_list') }}">Projects</a>
+            <a href="{{ url_for('tasks.tasks_list') }}" class="active">Tasks</a>
+            <div class="dropdown">
+                <a href="#">Accounts ▾</a>
+                <div class="dropdown-content">
+                    <a href="{{ url_for('accounts.invoice_list') }}">Invoice</a>
+                    <a href="{{ url_for('accounts.quotation_list') }}">Quotations</a>
+                </div>
+            </div>
+            <div class="dropdown">
+                <a href="#">Settings ▾</a>
+                <div class="dropdown-content">
+                    <a href="{{ url_for('employees.employee_list') }}">Employee Portal</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="user-profile">
+            <span class="welcome-text">Welcome, {{ current_user.username }}</span>
+            <div class="profile-dropdown">
+                <div class="profile-trigger">
+                    <img src="{{ get_profile_pic(current_user.employee) }}" alt="User" class="avatar">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <div class="form-container" style="max-width: 800px; margin: 2rem auto; background: #fff; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid rgba(13,27,42,0.1);">
+            
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 2rem; border-bottom: 2px solid rgba(212,175,55,0.2); padding-bottom: 1rem;">
+                <a href="{{ url_for('tasks.tasks_list') }}" class="back-btn" style="text-decoration: none; font-size: 1.5rem; color: var(--primary-color);">←</a>
+                <h2 style="font-family: var(--font-heading); color: var(--primary-color); margin: 0; font-size: 1.8rem;">Create New Task</h2>
+            </div>
+
+            {% with messages = get_flashed_messages(category_filter=["taskerror"]) %}
+            {% if messages %}
+            {% for message in messages %}
+            <div class="flash-message" style="padding: 15px; background-color: rgba(139, 0, 0, 0.04); border-left: 4px solid rgba(139, 0, 0, 0.5); color: #8b0000; margin-bottom: 1.5rem; border-radius: 4px;">
+                ⚠ {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('tasks.add_task') }}" method="POST">
+                <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label for="title" style="display: block; font-weight: 600; color: var(--primary-color); margin-bottom: 0.5rem;">Task Title <span style="color: #dc3545;">*</span></label>
+                        <input type="text" id="title" name="title" class="form-control" placeholder="E.g., Review glass measurements" required style="width: 100%; padding: 0.8rem; border: 1px solid rgba(13,27,42,0.2); border-radius: 6px;">
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label for="description" style="display: block; font-weight: 600; color: var(--primary-color); margin-bottom: 0.5rem;">Description</label>
+                        <textarea id="description" name="description" rows="4" class="form-control" placeholder="Provide task details..." style="width: 100%; padding: 0.8rem; border: 1px solid rgba(13,27,42,0.2); border-radius: 6px;"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="due_date" style="display: block; font-weight: 600; color: var(--primary-color); margin-bottom: 0.5rem;">Due Date</label>
+                        <input type="date" id="due_date" name="due_date" class="form-control" style="width: 100%; padding: 0.8rem; border: 1px solid rgba(13,27,42,0.2); border-radius: 6px;">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="status" style="display: block; font-weight: 600; color: var(--primary-color); margin-bottom: 0.5rem;">Status <span style="color: #dc3545;">*</span></label>
+                        <select id="status" name="status" class="form-control" required style="width: 100%; padding: 0.8rem; border: 1px solid rgba(13,27,42,0.2); border-radius: 6px;">
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed rgba(13,27,42,0.1);">
+                        <h4 style="margin: 0 0 1rem 0; color: var(--primary-color);">Task Relations (Optional)</h4>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="assigned_to" style="display: block; font-weight: 600; color: var(--primary-color); margin-bottom: 0.5rem;">Assigned To</label>
+                        <select id="assigned_to" name="assigned_to" class="form-control" style="width: 100%; padding: 0.8rem; border: 1px solid rgba(13,27,42,0.2); border-radius: 6px;">
+                            <option value="unassigned">-- Unassigned --</option>
+                            {% for emp in employees %}
+                                <option value="{{ emp.id }}" {% if current_user.employee and current_user.employee.id == emp.id %}selected{% endif %}>{{ emp.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="project_id" style="display: block; font-weight: 600; color: var(--primary-color); margin-bottom: 0.5rem;">Related Project</label>
+                        <select id="project_id" name="project_id" class="form-control" style="width: 100%; padding: 0.8rem; border: 1px solid rgba(13,27,42,0.2); border-radius: 6px;">
+                            <option value="none">-- Independent Task --</option>
+                            {% for p in projects %}
+                                <option value="{{ p.id }}" {% if pre_selected_project_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label for="lead_id" style="display: block; font-weight: 600; color: var(--primary-color); margin-bottom: 0.5rem;">Related Lead</label>
+                        <select id="lead_id" name="lead_id" class="form-control" style="width: 100%; padding: 0.8rem; border: 1px solid rgba(13,27,42,0.2); border-radius: 6px;">
+                            <option value="none">-- Independent Task --</option>
+                            {% for l in leads %}
+                                <option value="{{ l.id }}" {% if pre_selected_lead_id == l.id %}selected{% endif %}>{{ l.name }} {% if l.company %}({{ l.company }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                </div>
+
+                <div class="form-actions" style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                    <a href="{{ url_for('tasks.tasks_list') }}" class="btn-action" style="text-decoration: none; padding: 0.8rem 1.5rem; border: 1px solid rgba(13,27,42,0.2); color: var(--primary-color); border-radius: 6px; font-weight: 500;">Cancel</a>
+                    <button type="submit" class="btn-action gold" style="padding: 0.8rem 1.5rem; background-color: var(--accent-gold); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <span>✓</span> Create Task
+                    </button>
+                </div>
+            </form>
+        </div>
+
+    </main>
+</body>
+</html>
