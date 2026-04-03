@@ -15,8 +15,10 @@ from routes.projects import projects_bp
 from routes.api import api_bp
 from routes.tasks import tasks_bp
 from routes.accounts import accounts
+from whitenoise import WhiteNoise
 
 app = Flask(__name__, template_folder='Templates')
+app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/')
 app.config.from_object(Config)
 
 # Ensure upload directory exists

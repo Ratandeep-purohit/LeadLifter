@@ -142,7 +142,32 @@ Nginx will face the outside world and forward web traffic to Gunicorn via the `.
 
 ---
 
-## 🎉 Phase 6: You're Live!
+## 🛠️ Phase 6: Troubleshooting Static Files (CSS/Images Not Loading)
+
+If your site loads but looks like plain text or is missing images, follow these steps:
+
+1. **Check Directory Permissions**:
+   Nginx needs permission to read your static files. The `ubuntu` home directory is often restricted. Run:
+   ```bash
+   # Give the web server access to the project directory
+   chmod o+x /home/ubuntu
+   chmod -R 755 /home/ubuntu/CRM-GlassEntials/static
+   ```
+
+2. **Verify Nginx MIME Types**:
+   Ensure `/etc/nginx/nginx.conf` has `include /etc/nginx/mime.types;` (it usually does by default).
+
+3. **Check Nginx Logs for 403/404 errors**:
+   ```bash
+   sudo tail -f /var/log/nginx/error.log
+   ```
+
+4. **Case Sensitivity**:
+   Linux is case-sensitive. Ensure your code (e.g., `url_for('static', filename='css/home.css')`) exactly matches the folder name on disk (`static/css/`).
+
+---
+
+## 🎉 Phase 7: You're Live!
 
 If you navigate to your EC2 instance's Public IP address in your browser, your **GlassEntials CRM** should now be fully live!
 
