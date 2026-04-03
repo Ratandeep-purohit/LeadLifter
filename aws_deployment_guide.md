@@ -27,9 +27,9 @@ Once connected to your Ubuntu server, update it and install required system pack
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install python3-pip python3-venv python3-dev build-essential libmysqlclient-dev pkg-config nginx git -y
+sudo apt install python3-pip python3-venv python3-dev build-essential nginx git -y
 ```
-*(Note: `libmysqlclient-dev` and `pkg-config` are required for `mysqlclient`/`pymysql` to compile correctly on Linux).*
+*(Note: System-level database libraries are no longer required as the project uses SQLite).*
 
 ---
 
@@ -54,7 +54,7 @@ sudo apt install python3-pip python3-venv python3-dev build-essential libmysqlcl
    ```
 
 4. **Create the Production Environment File**:
-   Copy the example template and edit it with your production database credentials (e.g., an AWS RDS instance or a MySQL server you install on this EC2):
+   Copy the example template and ensure your `DATABASE_URL` is set to a local SQLite file (e.g., `sqlite:///production_db.sqlite`):
    ```bash
    cp .env.example .env
    nano .env

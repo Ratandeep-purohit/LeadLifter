@@ -41,7 +41,7 @@
 - **Flask-Migrate**: Professional-grade schema management and version control.
 
 ### Storage Excellence
-- **MySQL Direct**: High-performance relational storage for industry-scale data.
+- **SQLite Engine**: Zero-configuration, serverless relational database for rapid deployment and high reliability.
 - **Soft-Delete Architecture**: Advanced status-based query filtering for data preservation.
 
 ### Frontend Innovation
@@ -68,7 +68,8 @@ pip install -r requirements.txt
 
 ### 2. Database Synchronization
 ```bash
-# Initialize your local MySQL instance (Named: crm_db)
+# Initialize your local SQLite instance
+flask db init
 flask db migrate -m "Initial Industry Architecture"
 flask db upgrade
 ```
